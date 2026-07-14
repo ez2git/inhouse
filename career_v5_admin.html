@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>이력서 경력 데이터 마스터 관리자 v5</title>
+  <style>
+    body { font-family: 'Malgun Gothic', sans-serif; background: #f1f5f9; margin: 0; padding: 20px; color: #1e293b; }
+    .container { max-width: 1000px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); }
+    h1 { text-align: center; color: #0f172a; margin-bottom: 20px; border-bottom: 2px solid #cbd5e1; padding-bottom: 15px; font-size: 22px; }
+    
+    /* 상단 고정 컨트롤 패널 */
+    .sticky-panel { position: sticky; top: 0; background: #fff; padding: 15px 0; border-bottom: 1px solid #e2e8f0; z-index: 100; display: flex; flex-direction: column; gap: 10px; }
+    .btn-row { display: flex; gap: 8px; justify-content: center; align-items: center; flex-wrap: wrap; }
+    
+    button { padding: 8px 14px; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; transition: background 0.2s; font-size: 13px; display: inline-flex; align-items: center; gap: 4px; }
+    .btn-add { background: #0ea5e9; color: white; }
+    .btn-add:hover { background: #0284c7; }
+    .btn-toggle { background: #64748b; color: white; }
+    .btn-toggle:hover { background: #475569; }
+    .btn-generate { background: #6366f1; color: white; font-size: 14px; padding: 8px 20px; box-shadow: 0 4px 6px rgba(99,102,241,0.2); }
+    .btn-generate:hover { background: #4f46e5; }
+    .btn-danger { background: #ef4444; color: white; padding: 4px 8px; font-size: 11px; }
+    .btn-danger:hover { background: #dc2626; }
+    
+    /* 날짜 포맷 커스텀 빌더 구조 */
+    .config-box { background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; padding: 10px; display: flex; align-items: center; justify-content: center; gap: 6px; font-weight: bold; font-size: 12px; }
+    .fmt-group { display: inline-flex; align-items: center; gap: 3px; background: #e2e8f0; padding: 3px 6px; border-radius: 4px; }
+    .fmt-input { width: 45px; text-align: center; padding: 3px; border: 1px solid #94a3b8; border-radius: 3px; font-weight: bold; font-size: 12px; }
+    .sep-input { width: 25px; text-align: center; padding: 3px; border: 1px solid #94a3b8; border-radius: 3px; font-weight: bold; font-size: 12px; background: #fff; }
+
+    /* 드래그 앤 드롭 구조 */
+    .company-block { background: #f8fafc; border: 2px solid #cbd5e1; border-radius: 8px; margin-bottom: 15px; overflow: hidden; }
+    .company-header { display: flex; align-items: center; gap: 10px; background: #e2e8f0; padding: 10px 15px; }
+    .handle { cursor: grab; font-size: 16px; color: #64748b; padding: 0 5px; user-select: none; }
+    .handle:active { cursor: grabbing; }
+    .fold-btn { cursor: pointer; font-size: 14px; background: #fff; border: 1px solid #94a3b8; border-radius: 4px; padding: 2px 6px; font-weight: bold; }
+    
+    .company-title-input { font-size: 15px; font-weight: bold; padding: 4px 8px; width: 220px; border: 1px solid #94a3b8; border-radius: 4px; }
+    .fields-grid { padding: 15px; display: flex; flex-direction: column; gap: 8px; background: #fff; }
+    
+    .field-row { display: flex; gap: 8px; align-items: flex-start; background: #f8fafc; padding: 6px; border: 1px solid #e2e8f0; border-radius: 6px; }
+    .field-label { width: 130px; font-weight: bold; padding: 4px 6px; border: 1px solid #cbd5e1; border-radius: 4px; background: #f1f5f9; color: #334155; user-select: text; cursor: text; }
+    .field-value { flex: 1; padding: 5px 8px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 13px; color: #334155; font-family: inherit; user-select: text; cursor: text; }
+    textarea.field-value { resize: vertical; height: 28px; min-height: 28px; overflow-y: auto; line-height: 1.5; }
+    
+    .drag-over-comp { border: 2px dashed #3b82f6 !important; background: #eff6ff !important; }
+    .drag-over-field { border: 2px dashed #10b981 !important; background: #f0fdf4 !important; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h1>📝 이력서 경력 데이터 마스터 관리자 v3</h1>
+  
+  <div class="sticky-panel">
+    <div class="config-box" id="formatBuilder">
+      📅 커스텀 날짜 포맷 조립: 
+      <div class="fmt-group">
+        <span>연</span><input type="text" id="f_y" class="fmt-input" value="yyyy" onchange="saveConfig()">
+      </div>
+      <input type="text" id="f_s1" class="sep-input" value="." onchange="saveConfig()">
+      <div class="fmt-group">
+        <span>월</span><input type="text" id="f_m" class="fmt-input" value="mm" onchange="saveConfig()">
+      </div>
+      <input type="text" id="f_s2" class="sep-input" value="." onchange="saveConfig()">
+      <div class="fmt-group">
+        <span>일</span><input type="text" id="f_d" class="fmt-input" value="dd" onchange="saveConfig()">
+      </div>
+      <span style="color:#64748b; font-size:11px; margin-left:5px;">(포맷 예: yyyy / yy / mm / dd | 빈칸 가능)</span>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn-add" onclick="addCompany()">🏢 새 회사 그룹 추가</button>
+      <button class="btn-toggle" onclick="toggleAll(false)">📁 전체 접기</button>
+      <button class="btn-toggle" onclick="toggleAll(true)">📂 전체 펴기</button>
+      <button class="btn-toggle" style="background:#0d9488;" onclick="exportJSON()">📤 내보내기</button>
+      <button class="btn-toggle" style="background:#7c3aed;" onclick="document.getElementById('importFileInput').click()">📥 불러오기</button>
+      <button class="btn-generate" onclick="generateAndCopyScript()">⚡ 설정 완료 & 콘솔 치트키 복사하기</button>
+    </div>
+  </div>
+  <input type="file" id="importFileInput" accept=".json" style="display:none" onchange="importJSON(this)">
+
+  <div id="workspace"></div>
+</div>
+
+<script>
+  const defaultData = [
+    { company: "니즈게임즈", fields: [{label:"🏢 회사명", val:"니즈게임즈"}, {label:"💼 직급/직책", val:"실장 / PD · 기획"}, {label:"📅 시작 연월", val:"20250601"}, {label:"📅 종료 연월", val:"20260430"}, {label:"💰 연봉", val:"5500"}, {label:"🚪 퇴사 사유", val:"처우개선"}, {label:"📝 상세 업무 내용", val:"일본향 서브컬쳐 미소녀 전략 카드 게임 (전략/멀티)\n프로젝트 방향성 수립 및 추진 정상화, 사업팀 지원\n기획팀 관리 및 실무 진행\n일정 및 서비스 처리 대응, 글로벌 빌드"}] },
+    { company: "바닐라코드", fields: [{label:"🏢 회사명", val:"바닐라코드"}, {label:"💼 직급/직책", val:"팀장 / PM / 임원"}, {label:"📅 시작 연월", val:"20230201"}, {label:"📅 종료 연월", val:"20240229"}, {label:"💰 연봉", val:"6500"}, {label:"🚪 퇴사 사유", val:"경영악화"}, {label:"📝 상세 업무 내용", val:"'트리니티퍼즐사가' 북미향 3매치 퍼즐 및 SLOT 게임 개발(캐나다 라이브 진행) 출시\n개발 및 인력 관리\nCoin Exchange Platform 프로젝트"}] },
+    { company: "젠틀매니악", fields: [{label:"🏢 회사명", val:"젠틀매니악"}, {label:"💼 직급/직책", val:"팀장"}, {label:"📅 시작 연월", val:"20220601"}, {label:"📅 종료 연월", val:"20230131"}, {label:"💰 연봉", val:"6100"}, {label:"🚪 퇴사 사유", val:"상위 관리자급 전배 발령으로 인한 팀 재개편 및 드랍"}, {label:"📝 상세 업무 내용", val:"'마지막을대비하는...' 신규 서브컬쳐 프로젝트 개발 (로그라이크 슈팅 액션 RPG) 출시\n보스, 몬스터 전투 시스템, 오브젝트, 툴, 스킬 시스템 기획"}] },
+    { company: "팀미음", fields: [{label:"🏢 회사명", val:"팀미음"}, {label:"💼 직급/직책", val:"임원 / 실장 / 메인 기획 PD"}, {label:"📅 시작 연월", val:"20200701"}, {label:"📅 종료 연월", val:"20210630"}, {label:"💰 연봉", val:"6000"}, {label:"🚪 퇴사 사유", val:"경영악화"}, {label:"📝 상세 업무 내용", val:"'비트랙스' (캐주얼/음악) 출시\nM (3매치 퍼즐) 개발\nD 대머리키우기 (방치형) 출시\nG (턴+슬롯+포커+로그라이크) 출시"}] },
+    { company: "퍼니브로", fields: [{label:"🏢 회사명", val:"퍼니브로"}, {label:"💼 직급/직책", val:"과장"}, {label:"📅 시작 연월", val:"20181001"}, {label:"📅 종료 연월", val:"20190930"}, {label:"💰 연봉", val:"5500"}, {label:"🚪 퇴사 사유", val:"경영악화"}, {label:"📝 상세 업무 내용", val:"연예인 AR 서비스 앱 (커뮤니티/위치기반/증강현실)"}] },
+    { company: "넷마블엔투", fields: [{label:"🏢 회사명", val:"넷마블엔투"}, {label:"💼 직급/직책", val:"과장 / 리드 기획"}, {label:"📅 시작 연월", val:"20160801"}, {label:"📅 종료 연월", val:"20170930"}, {label:"💰 연봉", val:"4500"}, {label:"🚪 퇴사 사유", val:"직무확장"}, {label:"📝 상세 업무 내용", val:"'모두의마블 Compact' 모바일 보드 (캐주얼/PVP) 콘텐츠, UI/UX, 시스템, 연출, 스킬 기획"}] },
+    { company: "티쓰리엔터테인먼트", fields: [{label:"🏢 회사명", val:"티쓰리엔터테인먼트"}, {label:"💼 직급/직책", val:"대리 / 콘텐츠 기획"}, {label:"📅 시작 연월", val:"20151101"}, {label:"📅 종료 연월", val:"20160630"}, {label:"💰 연봉", val:"3600"}, {label:"🚪 퇴사 사유", val:"프로젝트 드랍 권고"}, {label:"📝 상세 업무 내용", val:"'오디션YG' 연예인 모바일 댄스 (수집/성장/소셜) 출시"}] },
+    { company: "아이즈소프트", fields: [{label:"🏢 회사명", val:"아이즈소프트"}, {label:"💼 직급/직책", val:"대리 / 메인 기획 파트장"}, {label:"📅 시작 연월", val:"20141201"}, {label:"📅 종료 연월", val:"20151130"}, {label:"💰 연봉", val:"3400"}, {label:"🚪 퇴사 사유", val:"티쓰리 지인의 스카우트 제의"}, {label:"📝 상세 업무 내용", val:"더 뮤지션 KR/US (캐주얼/소셜/음악)"}] },
+    { company: "소프톤엔터테인먼트", fields: [{label:"🏢 회사명", val:"소프톤엔터테인먼트"}, {label:"💼 직급/직책", val:"대리"}, {label:"📅 시작 연월", val:"20140201"}, {label:"📅 종료 연월", val:"20140831"}, {label:"💰 연봉", val:"3100"}, {label:"🚪 퇴사 사유", val:"경영악화"}, {label:"📝 상세 업무 내용", val:"모바일 액션 (횡스크롤/액션) TFT"}] },
+    { company: "엔큐플러스", fields: [{label:"🏢 회사명", val:"엔큐플러스"}, {label:"💼 직급/직책", val:"임원 / 메인 기획 PD"}, {label:"📅 시작 연월", val:"20121001"}, {label:"📅 종료 연월", val:"20131130"}, {label:"💰 연봉", val:"3700"}, {label:"🚪 퇴사 사유", val:"경영악화"}, {label:"📝 상세 업무 내용", val:"모바일 음악(캐주얼) 및 모바일 퍼즐(캐주얼) 개발"}] },
+    { company: "플러스엠엑스", fields: [{label:"🏢 회사명", val:"플러스엠엑스"}, {label:"💼 직급/직책", val:"선임연구원 / 메인 기획 PD"}, {label:"📅 시작 연월", val:"20120501"}, {label:"📅 종료 연월", val:"20121031"}, {label:"💰 연봉", val:"3100"}, {label:"🚪 퇴사 사유", val:"업직종전환"}, {label:"📝 상세 업무 내용", val:"모바일 TCG 드림나인 (야구/수집/전략), 비투게더 (캐주얼/음악)"}] },
+    { company: "네오윈게임즈", fields: [{label:"🏢 회사명", val:"네오윈게임즈"}, {label:"💼 직급/직책", val:"대리 / 메인 기획 PD"}, {label:"📅 시작 연월", val:"20110601"}, {label:"📅 종료 연월", val:"20120531"}, {label:"💰 연봉", val:"2600"}, {label:"🚪 퇴사 사유", val:"경영악화"}, {label:"📝 상세 업무 내용", val:"네오디제이 (캐주얼/음악), 파이터시티 (방치형/수집/성장)"}] },
+    { company: "나우콤", fields: [{label:"🏢 회사명", val:"나우콤"}, {label:"💼 직급/직책", val:"대리 / 라이브 메인 기획"}, {label:"📅 시작 연월", val:"20081201"}, {label:"📅 종료 연월", val:"20100228"}, {label:"💰 연봉", val:"2400"}, {label:"🚪 퇴사 사유", val:"갑작스러운 회사 분할 및 장거리 이전"}, {label:"📝 상세 업무 내용", val:"오투잼 PC 온라인 (라이브/PVP/음악)"}] },
+    { company: "어뮤즈월드", fields: [{label:"🏢 회사명", val:"어뮤즈월드"}, {label:"💼 직급/직책", val:"대리 / 메인 기획 PD"}, {label:"📅 시작 연월", val:"20040401"}, {label:"📅 종료 연월", val:"20050831"}, {label:"💰 연봉", val:"1600"}, {label:"🚪 퇴사 사유", val:"약속 불이행으로 군입대 (제대 후 나우콤 복귀)"}, {label:"📝 상세 업무 내용", val:"아케이드 (시뮬레이션/음악)"}] },
+    { company: "오투미디어", fields: [{label:"🏢 회사명", val:"오투미디어"}, {label:"💼 직급/직책", val:"팀장 / 콘텐츠 기획"}, {label:"📅 시작 연월", val:"20030101"}, {label:"📅 종료 연월", val:"20040430"}, {label:"💰 연봉", val:"890"}, {label:"🚪 퇴사 사유", val:"병특 약속으로 어뮤즈월드 파견 입사"}, {label:"📝 상세 업무 내용", val:"오투잼 PC 온라인 (라이브/PVP/음악) 운영 및 콘텐츠 기획"}] }
+  ];
+
+  let currentData = JSON.parse(localStorage.getItem('career_v3_data')) || defaultData;
+  let collapsedStates = {};
+  let dragSrcEl = null;
+
+  // 수동 resize 높이 저장소
+  let fieldHeights = JSON.parse(localStorage.getItem('career_v3_heights') || '{}');
+  function hKey(compName, label) { return compName + '|||' + label; }
+  function saveHeight(compName, label, h) {
+    fieldHeights[hKey(compName, label)] = h;
+    localStorage.setItem('career_v3_heights', JSON.stringify(fieldHeights));
+  }
+  function loadHeight(compName, label) { return fieldHeights[hKey(compName, label)] || null; }
+
+  function saveConfig() {
+    const cfg = {
+      y: document.getElementById('f_y').value, s1: document.getElementById('f_s1').value,
+      m: document.getElementById('f_m').value, s2: document.getElementById('f_s2').value,
+      d: document.getElementById('f_d').value
+    };
+    localStorage.setItem('career_v3_fmt_obj', JSON.stringify(cfg));
+  }
+
+  window.onload = () => {
+    const saved = localStorage.getItem('career_v3_fmt_obj');
+    if(saved) {
+      const c = JSON.parse(saved);
+      document.getElementById('f_y').value = c.y; document.getElementById('f_s1').value = c.s1;
+      document.getElementById('f_m').value = c.m; document.getElementById('f_s2').value = c.s2;
+      document.getElementById('f_d').value = c.d;
+    }
+    renderData();
+  };
+
+  // [드래그 중 auto-scroll] HTML5 drag API 세션 중 휠 이벤트 차단을 우회
+  document.addEventListener('dragover', (e) => {
+    const ZONE = 100, MAX_SPEED = 18;
+    if (e.clientY < ZONE) {
+      window.scrollBy(0, -Math.ceil(MAX_SPEED * (1 - e.clientY / ZONE)));
+    } else if (e.clientY > window.innerHeight - ZONE) {
+      window.scrollBy(0, Math.ceil(MAX_SPEED * (1 - (window.innerHeight - e.clientY) / ZONE)));
+    }
+  });
+
+  function renderData() {
+    const workspace = document.getElementById('workspace');
+    workspace.innerHTML = '';
+
+    currentData.forEach((comp, cIdx) => {
+      const isFolded = collapsedStates[comp.company] || false;
+      const compBlock = document.createElement('div');
+      compBlock.className = 'company-block';
+      compBlock.dataset.cidx = cIdx;
+
+      compBlock.innerHTML = `
+        <div class="company-header">
+          <div class="handle class-comp-handle">☰</div>
+          <button class="fold-btn" onclick="toggleCompany('${comp.company}')">${isFolded ? '▶' : '▼'}</button>
+          <input type="text" class="company-title-input" value="${comp.company}" onchange="syncDOMToData()">
+          <button class="btn-add" style="background:#4b5563; padding:4px 10px; font-size:11px;" onclick="addField(${cIdx})">➕ 필드 추가</button>
+          <button class="btn-danger" style="margin-left:auto;" onclick="removeCompany(${cIdx})">❌ 삭제</button>
+        </div>
+        <div class="fields-grid" style="display: ${isFolded ? 'none' : 'flex'};"></div>
+      `;
+
+      const fieldsGrid = compBlock.querySelector('.fields-grid');
+      
+      comp.fields.forEach((f, fIdx) => {
+        const row = document.createElement('div');
+        row.className = 'field-row';
+        row.dataset.fidx = fIdx;
+
+        const isTextArea = true; // 모든 필드를 textarea로 통일 (엔터 줄바꿈 지원)
+        const safeVal = f.val.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        const valElement = `<textarea class="field-value" onchange="syncDOMToData()">${safeVal}</textarea>`;
+
+        row.innerHTML = `
+          <div class="handle class-field-handle" style="padding-top:5px;">⋮⋮</div>
+          <input type="text" class="field-label" value="${f.label}" onchange="syncDOMToData()">
+          ${valElement}
+          <button class="btn-danger" style="padding:2px 6px; margin-top:2px; flex-shrink:0;" onclick="removeField(${cIdx}, ${fIdx})">🗑️</button>
+        `;
+
+        // 저장된 높이 복원 (없으면 기본 28px CSS에 위임)
+        const ta = row.querySelector('textarea.field-value');
+        if (ta) {
+          const savedH = loadHeight(comp.company, f.label);
+          if (savedH) { ta.style.height = savedH; }
+
+          // 수동 resize 감지 → 높이 변경 시 저장
+          let prevH = 0;
+          ta.addEventListener('mousedown', () => { prevH = ta.offsetHeight; });
+          ta.addEventListener('mouseup', () => {
+            const newH = ta.offsetHeight;
+            if (newH !== prevH && newH > 0) {
+              saveHeight(comp.company, f.label, newH + 'px');
+            }
+          });
+        }
+        
+        // 텍스트 드래그/선택 시 field-row draggable 간섭 방지
+        ta && ta.addEventListener('mousedown', (e) => { e.stopPropagation(); row.setAttribute('draggable', 'false'); });
+        const lbl = row.querySelector('.field-label');
+        lbl && lbl.addEventListener('mousedown', (e) => { e.stopPropagation(); row.setAttribute('draggable', 'false'); });
+
+        // [정밀 수정] 필드가 부모 회사 블록 밖으로 탈출하는 스필오버 버그 차단
+        bindFieldDragEvents(row, fieldsGrid);
+        fieldsGrid.appendChild(row);
+      });
+
+      bindCompanyDragEvents(compBlock, workspace);
+      workspace.appendChild(compBlock);
+    });
+  }
+
+  // 회사 단위 드래그 바인딩
+  function bindCompanyDragEvents(el, parent) {
+    const handle = el.querySelector('.class-comp-handle');
+    handle.onmousedown = () => el.setAttribute('draggable', 'true');
+    handle.onmouseup = () => el.setAttribute('draggable', 'false');
+
+    el.addEventListener('dragstart', (e) => { dragSrcEl = el; e.dataTransfer.effectAllowed = 'move'; });
+    el.addEventListener('dragend', () => { document.querySelectorAll('.company-block').forEach(b => b.classList.remove('drag-over-comp')); syncDOMToData(); });
+    el.addEventListener('dragover', (e) => { if(dragSrcEl !== el && dragSrcEl.className === 'company-block') { e.preventDefault(); el.classList.add('drag-over-comp'); } });
+    el.addEventListener('dragleave', () => el.classList.remove('drag-over-comp'));
+    el.addEventListener('drop', (e) => {
+      e.stopPropagation();
+      if (dragSrcEl !== el && dragSrcEl.className === 'company-block') {
+        const children = Array.from(parent.children);
+        if(children.indexOf(dragSrcEl) < children.indexOf(el)) parent.insertBefore(dragSrcEl, el.nextSibling);
+        else parent.insertBefore(dragSrcEl, el);
+      }
+    });
+  }
+
+  // [수정 완료] 회사 "내부"에서만 순서가 변경되도록 격리하는 필드 드래그 핸들러
+  function bindFieldDragEvents(el, parentGrid) {
+    const handle = el.querySelector('.class-field-handle');
+    handle.onmousedown = () => el.setAttribute('draggable', 'true');
+    handle.onmouseup = () => el.setAttribute('draggable', 'false');
+
+    el.addEventListener('dragstart', (e) => { dragSrcEl = el; e.dataTransfer.effectAllowed = 'move'; e.stopPropagation(); });
+    el.addEventListener('dragend', () => { parentGrid.querySelectorAll('.field-row').forEach(b => b.classList.remove('drag-over-field')); syncDOMToData(); });
+    
+    el.addEventListener('dragover', (e) => {
+      // 드래그 대상이 동일한 회사 내의 필드인 경우에만 드롭을 수락함 (타사 간 침범 방지)
+      if (dragSrcEl !== el && dragSrcEl.className === 'field-row' && dragSrcEl.parentNode === parentGrid) {
+        e.preventDefault();
+        el.classList.add('drag-over-field');
+      }
+    });
+    el.addEventListener('dragleave', () => el.classList.remove('drag-over-field'));
+    el.addEventListener('drop', (e) => {
+      e.stopPropagation();
+      if (dragSrcEl !== el && dragSrcEl.className === 'field-row' && dragSrcEl.parentNode === parentGrid) {
+        const children = Array.from(parentGrid.children);
+        if(children.indexOf(dragSrcEl) < children.indexOf(el)) parentGrid.insertBefore(dragSrcEl, el.nextSibling);
+        else parentGrid.insertBefore(dragSrcEl, el);
+      }
+    });
+  }
+
+  function syncDOMToData() {
+    const newStructure = [];
+    document.querySelectorAll('.company-block').forEach(compEl => {
+      const companyName = compEl.querySelector('.company-title-input').value;
+      const fields = [];
+      compEl.querySelectorAll('.field-row').forEach(fieldEl => {
+        fields.push({ label: fieldEl.querySelector('.field-label').value, val: fieldEl.querySelector('.field-value').value });
+      });
+      newStructure.push({ company: companyName, fields: fields });
+    });
+    currentData = newStructure;
+    localStorage.setItem('career_v3_data', JSON.stringify(currentData));
+  }
+
+  function toggleCompany(name) { collapsedStates[name] = !collapsedStates[name]; renderData(); }
+  function toggleAll(show) { currentData.forEach(c => collapsedStates[c.company] = !show); renderData(); }
+  function addCompany() { currentData.unshift({ company: "새 회사명", fields: [{label:"🏢 회사명", val:"새 회사명"}, {label:"📅 시작 연월", val:"20260101"}] }); renderData(); syncDOMToData(); }
+  function removeCompany(idx) { if(confirm("회사를 삭제하시겠습니까?")) { currentData.splice(idx, 1); renderData(); syncDOMToData(); } }
+  function addField(cIdx) { currentData[cIdx].fields.push({label:"✏️ 새 항목명", val:""}); renderData(); syncDOMToData(); }
+  function removeField(cIdx, fIdx) { currentData[cIdx].fields.splice(fIdx, 1); renderData(); syncDOMToData(); }
+
+  // ─── 내보내기 ───────────────────────────────────────────────
+  function exportJSON() {
+    syncDOMToData(); // 최신 DOM 상태를 currentData에 반영
+
+    // 현재 날짜 포맷 설정 수집
+    const fmt = {
+      y:  document.getElementById('f_y').value,
+      s1: document.getElementById('f_s1').value,
+      m:  document.getElementById('f_m').value,
+      s2: document.getElementById('f_s2').value,
+      d:  document.getElementById('f_d').value
+    };
+
+    const snapshot = {
+      version:    'career_admin',
+      exportedAt: new Date().toISOString(),
+      data:       currentData,
+      heights:    fieldHeights,
+      fmt:        fmt,
+      collapsed:  collapsedStates
+    };
+
+    const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: 'application/json' });
+    const url  = URL.createObjectURL(blob);
+    const ts   = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = `career_admin_backup_${ts}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  // ─── 불러오기 ────────────────────────────────────────────────
+  function importJSON(input) {
+    const file = input.files[0];
+    if (!file) return;
+    input.value = ''; // 같은 파일 재선택 허용 초기화
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      let snap;
+      try {
+        snap = JSON.parse(e.target.result);
+      } catch {
+        alert('❌ JSON 파싱 오류: 유효한 파일이 아닙니다.');
+        return;
+      }
+
+      // 구조 검증 (버전 문자열이 다를 수 있으므로 data 배열 존재 여부만 체크)
+      if (!Array.isArray(snap.data)) {
+        alert('❌ 호환되지 않는 파일입니다.\n이 도구에서 내보낸 JSON 파일만 불러올 수 있습니다.');
+        return;
+      }
+
+      if (!confirm(`📥 불러오기를 진행하면 현재 작업 내용이 모두 교체됩니다.\n내보내기 시각: ${snap.exportedAt || '불명'}\n계속하시겠습니까?`)) return;
+
+      // ── 상태 전체 복원 ──
+      currentData     = snap.data;
+      fieldHeights    = snap.heights  || {};
+      collapsedStates = snap.collapsed || {};
+
+      // localStorage 동기화
+      localStorage.setItem('career_v3_data',    JSON.stringify(currentData));
+      localStorage.setItem('career_v3_heights', JSON.stringify(fieldHeights));
+      localStorage.setItem('career_v3_fmt_obj', JSON.stringify(snap.fmt || {}));
+
+      // 날짜 포맷 UI 복원
+      if (snap.fmt) {
+        const f = snap.fmt;
+        if (f.y  !== undefined) document.getElementById('f_y').value  = f.y;
+        if (f.s1 !== undefined) document.getElementById('f_s1').value = f.s1;
+        if (f.m  !== undefined) document.getElementById('f_m').value  = f.m;
+        if (f.s2 !== undefined) document.getElementById('f_s2').value = f.s2;
+        if (f.d  !== undefined) document.getElementById('f_d').value  = f.d;
+      }
+
+      renderData();
+      alert(`✅ 불러오기 완료!\n총 ${currentData.length}개 회사 데이터가 복원됐습니다.`);
+    };
+    reader.readAsText(file, 'UTF-8');
+  }
+
+  function generateAndCopyScript() {
+    syncDOMToData();
+    const cleanData = JSON.stringify(currentData);
+    
+    // 초기 조립용 설정 패킷 가공
+    const cfg = {
+      y: document.getElementById('f_y').value, s1: document.getElementById('f_s1').value,
+      m: document.getElementById('f_m').value, s2: document.getElementById('f_s2').value,
+      d: document.getElementById('f_d').value
+    };
+
+    const compiledCode = `(function() {
+      const careerData = ${cleanData};
+      let currentFmt = ${JSON.stringify(cfg)};
+      
+      const old = document.getElementById('career-master-v5-runtime');
+      if(old) old.remove();
+
+      // 패턴 매칭 커스텀 파서 엔진 탑재
+      function parseDateString(rawVal, fmt) {
+        if (!/^\\d{8}$/.test(rawVal)) return rawVal;
+        const y4 = rawVal.substring(0, 4);
+        const y2 = rawVal.substring(2, 4);
+        const mm = rawVal.substring(4, 6);
+        const dd = rawVal.substring(6, 8);
+        
+        let out = "";
+        if(fmt.y === 'yyyy') out += y4; else if(fmt.y === 'yy') out += y2; else out += fmt.y;
+        out += fmt.s1;
+        if(fmt.m === 'mm') out += mm; else out += fmt.m;
+        out += fmt.s2;
+        if(fmt.d === 'dd') out += dd; else out += fmt.d;
+        return out;
+      }
+
+      function isDateField(label) {
+        return label.includes('날짜') || label.includes('연월') || label.includes('시작') || label.includes('종료') || label.includes('일자') || label.includes('기간');
+      }
+
+      const wrap = document.createElement('div');
+      wrap.id = 'career-master-v5-runtime';
+      wrap.style.position = 'fixed'; wrap.style.top = '20px'; wrap.style.right = '20px';
+      wrap.style.width = '370px'; wrap.style.height = '75vh'; wrap.style.zIndex = '2147483647';
+      wrap.style.background = '#f8fafc'; wrap.style.border = '2px solid #0f172a';
+      wrap.style.borderRadius = '8px'; wrap.style.boxShadow = '0 20px 25px -5px rgba(0,0,0,0.3)';
+      wrap.style.display = 'flex'; wrap.style.flexDirection = 'column';
+      wrap.style.fontFamily = 'sans-serif'; wrap.style.fontSize = '12px';
+      wrap.style.resize = 'both'; wrap.style.overflow = 'hidden';
+
+      // 1. 컴팩트 통합 헤더 (바디 전체 드래그 이동 스펙 지원)
+      const header = document.createElement('div');
+      header.style.background = '#0f172a'; header.style.color = '#fff'; header.style.padding = '8px 12px';
+      header.style.fontWeight = 'bold'; header.style.display = 'flex'; header.style.justifyContent = 'space-between'; header.style.alignItems = 'center';
+      header.style.userSelect = 'none';
+      
+      const titleSpan = document.createElement('span');
+      titleSpan.innerText = '✛ 경력 제어 마스터 보드';
+      header.appendChild(titleSpan);
+
+      const closeBtn = document.createElement('span');
+      closeBtn.innerText = '✕'; closeBtn.style.cursor = 'pointer'; closeBtn.style.padding = '2px 6px';
+      closeBtn.style.background = '#334155'; closeBtn.style.borderRadius = '4px'; closeBtn.style.fontSize = '11px';
+      closeBtn.onclick = () => wrap.remove();
+      header.appendChild(closeBtn);
+      wrap.appendChild(header);
+
+      // 2. [공간 극대화 초정밀 압축] 1줄 통합 인터페이스 메뉴 바
+      const menuBar = document.createElement('div');
+      menuBar.style.background = '#f1f5f9'; menuBar.style.padding = '5px 8px';
+      menuBar.style.borderBottom = '1px solid #cbd5e1'; menuBar.style.display = 'flex';
+      menuBar.style.alignItems = 'center'; menuBar.style.justifyContent = 'space-between'; menuBar.style.gap = '5px';
+
+      // 왼쪽: 모드 스위치
+      const modeDiv = document.createElement('div');
+      modeDiv.style.display = 'flex'; modeDiv.style.gap = '6px'; modeDiv.style.fontWeight = 'bold'; modeDiv.style.fontSize = '11px';
+      modeDiv.innerHTML = \`
+        <label style="cursor:pointer;"><input type="radio" name="dragMode" value="replace" checked> 덮기</label>
+        <label style="cursor:pointer;"><input type="radio" name="dragMode" value="append"> 연사</label>
+      \`;
+      menuBar.appendChild(modeDiv);
+
+      // 오른쪽: 초미니 인풋 포맷 조립기 (한 줄 병렬 배치)
+      const fmtDiv = document.createElement('div');
+      fmtDiv.style.display = 'flex'; fmtDiv.style.alignItems = 'center'; fmtDiv.style.gap = '2px'; fontStyle = 'font-weight:bold;';
+      fmtDiv.innerHTML = \`
+        <input type="text" id="b_y" value="\${currentFmt.y}" style="width:28px; text-align:center; font-size:10px; padding:1px; border:1px solid #94a3b8;">
+        <input type="text" id="b_s1" value="\${currentFmt.s1}" style="width:12px; text-align:center; font-size:10px; padding:1px; border:1px solid #94a3b8; background:#fff;">
+        <input type="text" id="b_m" value="\${currentFmt.m}" style="width:22px; text-align:center; font-size:10px; padding:1px; border:1px solid #94a3b8;">
+        <input type="text" id="b_s2" value="\${currentFmt.s2}" style="width:12px; text-align:center; font-size:10px; padding:1px; border:1px solid #94a3b8; background:#fff;">
+        <input type="text" id="b_d" value="\${currentFmt.d}" style="width:22px; text-align:center; font-size:10px; padding:1px; border:1px solid #94a3b8;">
+      \`;
+      menuBar.appendChild(fmtDiv);
+      wrap.appendChild(menuBar);
+
+      // 기능 바인딩용 함수 정의
+      function getActiveFmt() {
+        return {
+          y: wrap.querySelector('#b_y').value, s1: wrap.querySelector('#b_s1').value,
+          m: wrap.querySelector('#b_m').value, s2: wrap.querySelector('#b_s2').value,
+          d: wrap.querySelector('#b_d').value
+        };
+      }
+
+      const selectorZone = document.createElement('div');
+      selectorZone.style.padding = '6px'; selectorZone.style.borderBottom = '1px solid #cbd5e1';
+      selectorZone.style.maxHeight = '110px'; selectorZone.style.overflowY = 'auto';
+      selectorZone.style.display = 'flex'; selectorZone.style.flexWrap = 'wrap'; selectorZone.style.gap = '4px';
+      selectorZone.style.flexShrink = '0';
+
+      const displayZone = document.createElement('div');
+      displayZone.style.flex = '1'; displayZone.style.padding = '10px';
+      displayZone.style.overflowY = 'auto'; displayZone.style.background = '#fff';
+      displayZone.innerHTML = '<div style="color:#64748b; text-align:center; margin-top:40px;">회사를 선택하면 스티커가 주입됩니다.</div>';
+
+      function injectData(targetEl, label, rawValue) {
+        if (!targetEl) return;
+        targetEl.focus();
+        
+        const processedValue = isDateField(label) ? parseDateString(rawValue, getActiveFmt()) : rawValue;
+        const mode = wrap.querySelector('input[name="dragMode"]:checked').value;
+        const currentVal = targetEl.value || "";
+        
+        // [수정요청] 공백 및 엔터 분할 문자 연산 제거 -> 완벽한 다이렉트 밀착 접착
+        const finalVal = (mode === 'append') ? (currentVal + processedValue) : processedValue;
+
+        targetEl.value = finalVal;
+        const setter = Object.getOwnPropertyDescriptor(targetEl.tagName === 'TEXTAREA' ? window.HTMLTextAreaElement.prototype : window.HTMLInputElement.prototype, 'value')?.set;
+        if (setter) setter.call(targetEl, finalVal);
+        
+        targetEl.dispatchEvent(new Event('input', { bubbles: true }));
+        targetEl.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+
+      document.addEventListener('dragover', (e) => {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') e.preventDefault();
+        // [드래그 중 스크롤] HTML5 drag 세션 중 wheel 이벤트는 브라우저가 차단하므로 마우스 위치 기반 auto-scroll로 대체
+        const ZONE = 100, MAX_SPEED = 18;
+        if (e.clientY < ZONE) {
+          window.scrollBy(0, -Math.ceil(MAX_SPEED * (1 - e.clientY / ZONE)));
+        } else if (e.clientY > window.innerHeight - ZONE) {
+          window.scrollBy(0, Math.ceil(MAX_SPEED * (1 - (window.innerHeight - e.clientY) / ZONE)));
+        }
+      });
+      document.addEventListener('drop', (e) => {
+        const target = e.target;
+        if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+          e.preventDefault(); // 브라우저 기본 텍스트 삽입을 여기서 먼저 차단
+          try {
+            const jsonData = e.dataTransfer.getData('application/json');
+            if (jsonData) {
+              const dataPacket = JSON.parse(jsonData);
+              if (dataPacket && dataPacket.val) { injectData(target, dataPacket.label, dataPacket.val); }
+            }
+          } catch(err) {}
+        }
+      });
+
+      careerData.forEach((data) => {
+        const btn = document.createElement('button');
+        btn.innerText = data.company;
+        btn.style.padding = '3px 6px'; btn.style.border = '1px solid #94a3b8';
+        btn.style.borderRadius = '4px'; btn.style.background = '#fff'; btn.style.cursor = 'pointer';
+        btn.style.fontSize = '11px'; btn.style.fontWeight = 'bold';
+
+        btn.onclick = () => {
+          Array.from(selectorZone.children).forEach(b => { b.style.background = '#fff'; b.style.color = '#1e293b'; });
+          btn.style.background = '#2563eb'; btn.style.color = '#fff';
+          displayZone.innerHTML = '';
+          
+          data.fields.forEach(f => {
+            const box = document.createElement('div');
+            box.style.marginBottom = '8px';
+
+            const lbl = document.createElement('div');
+            lbl.style.fontWeight = 'bold'; lbl.style.color = '#475569'; lbl.style.marginBottom = '2px';
+            lbl.style.fontSize = '11px'; lbl.innerText = f.label;
+            box.appendChild(lbl);
+
+            const sticker = document.createElement('div');
+            sticker.setAttribute('draggable', 'true');
+            sticker.style.padding = '5px 7px'; sticker.style.background = '#fef08a';
+            sticker.style.border = '1px solid #fde047'; sticker.style.borderRadius = '4px';
+            sticker.style.cursor = 'grab'; sticker.style.whiteSpace = 'pre-wrap';
+            
+            sticker.innerText = isDateField(f.label) ? parseDateString(f.val, getActiveFmt()) : f.val;
+            
+            sticker.addEventListener('dragstart', (ev) => {
+              const packet = { label: f.label, val: f.val };
+              ev.dataTransfer.setData('application/json', JSON.stringify(packet));
+              ev.dataTransfer.setData('text/plain', ''); // 브라우저 기본 텍스트 삽입 방지
+            });
+
+            sticker.onclick = () => {
+              const txt = isDateField(f.label) ? parseDateString(f.val, getActiveFmt()) : f.val;
+              navigator.clipboard.writeText(txt);
+            };
+
+            box.appendChild(sticker); displayZone.appendChild(box);
+          });
+        };
+        selectorZone.appendChild(btn);
+      });
+
+      // 인풋 박스에서 임의 문자 타이핑 시 스티커 레이블 런타임 연산 동기화 트리거
+      menuBar.querySelectorAll('input[type="text"]').forEach(inp => {
+        inp.oninput = () => {
+          const activeBtn = Array.from(selectorZone.children).find(b => b.style.background.includes('2563eb'));
+          if(activeBtn) activeBtn.click();
+        };
+      });
+
+      wrap.appendChild(selectorZone); wrap.appendChild(displayZone);
+      document.body.appendChild(wrap);
+
+      // [가속 제어 설계] 빈 바디 및 헤더 모두 드래그 인터셉트 지원 + 스크린 이탈 원천 금지
+      let isDragging = false; let ox = 0; let oy = 0;
+      
+      function handleDragStart(e) {
+        // 인풋, 버튼, 스티커, 셀렉트 존의 스크롤바 컴포넌트 터치 시 드래그 기하 변환 연산 오버라이딩 차단
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON' || e.target.tagName === 'SELECT' || e.target.getAttribute('draggable') || e.target.closest('#career-master-v5-runtime > div:nth-child(3)') || e.target.closest('#career-master-v5-runtime > div:nth-child(4)')) return;
+        
+        isDragging = true; wrap.style.right = 'auto';
+        ox = e.clientX - wrap.offsetLeft; oy = e.clientY - wrap.offsetTop;
+      }
+
+      header.addEventListener('mousedown', handleDragStart);
+      wrap.addEventListener('mousedown', handleDragStart); // 빈 바디 영역 인터셉트 추가
+
+      document.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        let targetX = e.clientX - ox;
+        let targetY = e.clientY - oy;
+
+        const maxX = window.innerWidth - wrap.offsetWidth;
+        const maxY = window.innerHeight - wrap.offsetHeight;
+
+        // 상단 가드 및 전체 바운더리 강제 통제 연산
+        if (targetX < 0) targetX = 0; if (targetX > maxX) targetX = maxX;
+        if (targetY < 0) targetY = 0; if (targetY > maxY) targetY = maxY;
+
+        wrap.style.left = targetX + 'px'; wrap.style.top = targetY + 'px';
+      });
+
+      document.addEventListener('mouseup', () => { isDragging = false; });
+    })();`;
+
+    navigator.clipboard.writeText(compiledCode).then(() => {
+      alert("✅ 로컬 데이터 백업 및 조립형 마스터 치트키 복사가 완료되었습니다!\n채용 공고 사이트 콘솔 창에 붙여넣기 하십시오.");
+    });
+  }
+</script>
+</body>
+</html>
